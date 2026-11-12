@@ -7,6 +7,7 @@ import { reporteCacheado } from '../vivo.js';
 
 const router = Router();
 const reFecha = /^\d{4}-\d{2}-\d{2}$/;
+const flotaDe = (req) => (req.query.flota ? parseId(req.query.flota) : null);
 
 function rango(req) {
   const hoy = new Date().toISOString().slice(0, 10);
@@ -17,13 +18,14 @@ function rango(req) {
   return { desde, hasta };
 }
 
-async function operacionesEnRango({ desde, hasta, agenteId }) {
+async function operacionesEnRango({ desde, hasta, agenteId, flotaId = null }) {
   const { rows } = await query(
     `SELECT o.*, a.nombre AS agente
        FROM operaciones o JOIN agentes a ON a.id = o.agente_id
       WHERE left(o.clave, 10) BETWEEN $1 AND $2 AND ($3::int IS NULL OR o.agente_id = $3)
+        AND ($4::int IS NULL OR a.flota_id = $4)
       ORDER BY o.clave DESC, a.nombre`,
-    [desde, hasta, agenteId]
+    [desde, hasta, agenteId, flotaId]
   );
   const salida = [];
   for (const o of rows) salida.push({ o, reporte: await reporteCacheado(o) });
@@ -36,7 +38,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const agenteId = req.query.agente ? parseId(req.query.agente) : null;
     if (req.query.agente && !agenteId) return res.status(400).json({ error: 'Motocarro no válido' });
-    const ops = await operacionesEnRango({ ...rango(req), agenteId });
+    const ops = await operacionesEnRango({ ...rango(req), agenteId, flotaId: flotaDe(req) });
     res.json(
       ops.map(({ o, reporte }) => ({
         id: o.id,
@@ -58,7 +60,7 @@ router.get(
   '/resumen',
   asyncHandler(async (req, res) => {
     const r = rango(req);
-    const ops = await operacionesEnRango({ ...r, agenteId: null });
+    const ops = await operacionesEnRango({ ...r, agenteId: null, flotaId: flotaDe(req) });
     const vacio = () => ({
       operaciones: 0,
       duracionMs: 0,

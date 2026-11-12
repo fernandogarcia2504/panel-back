@@ -2,14 +2,15 @@
 import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { hashToken, nuevoToken, requireAdmin } from '../middleware/auth.js';
-import { asyncHandler, validarId } from '../middleware/errors.js';
+import { asyncHandler, parseId, validarId } from '../middleware/errors.js';
 import { lanzarSiHayErrores, texto } from '../validacion.js';
 import { horarioValido } from '../horario.js';
 
 const router = Router();
 
 const COLS = `id, nombre, notas, horario, activo, created_at AS "creado", ultima_vez AS "ultimaVez",
-  version_agente AS version, so`;
+  version_agente AS version, so, flota_id AS "flotaId",
+  (SELECT nombre FROM flotas f WHERE f.id = agentes.flota_id) AS flota`;
 
 function validar(b, e) {
   const nombre = texto(e, b.nombre, 'Nombre', { requerido: true, max: 60 });
@@ -27,13 +28,21 @@ function validar(b, e) {
       };
     }
   }
-  return { nombre, notas, horario };
+  const flotaId = parseId(b.flotaId);
+  if (!flotaId) e.push('Selecciona la flota');
+  return { nombre, notas, horario, flotaId };
+}
+
+async function flotaExiste(id) {
+  const { rows } = await query('SELECT 1 FROM flotas WHERE id = $1', [id]);
+  return !!rows[0];
 }
 
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { rows } = await query(`SELECT ${COLS} FROM agentes ORDER BY nombre`);
+    const flota = req.query.flota ? parseId(req.query.flota) : null;
+    const { rows } = await query(`SELECT ${COLS} FROM agentes WHERE ($1::int IS NULL OR flota_id = $1) ORDER BY nombre`, [flota]);
     res.json(rows);
   })
 );
@@ -45,11 +54,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const e = [];
     const d = validar(req.body ?? {}, e);
+    if (d.flotaId && !(await flotaExiste(d.flotaId))) e.push('La flota no existe');
     lanzarSiHayErrores(e);
     const token = nuevoToken();
     const { rows } = await query(
-      `INSERT INTO agentes (nombre, notas, horario, token_hash) VALUES ($1, $2, $3, $4) RETURNING ${COLS}`,
-      [d.nombre, d.notas, d.horario ? JSON.stringify(d.horario) : null, hashToken(token)]
+      `INSERT INTO agentes (nombre, notas, horario, token_hash, flota_id) VALUES ($1, $2, $3, $4, $5) RETURNING ${COLS}`,
+      [d.nombre, d.notas, d.horario ? JSON.stringify(d.horario) : null, hashToken(token), d.flotaId]
     );
     res.status(201).json({ ...rows[0], token });
   })
@@ -62,11 +72,12 @@ router.put(
   asyncHandler(async (req, res) => {
     const e = [];
     const d = validar(req.body ?? {}, e);
+    if (d.flotaId && !(await flotaExiste(d.flotaId))) e.push('La flota no existe');
     lanzarSiHayErrores(e);
     const activo = req.body?.activo !== false;
     const { rows } = await query(
-      `UPDATE agentes SET nombre = $2, notas = $3, horario = $4, activo = $5 WHERE id = $1 RETURNING ${COLS}`,
-      [req.params.id, d.nombre, d.notas, d.horario ? JSON.stringify(d.horario) : null, activo]
+      `UPDATE agentes SET nombre = $2, notas = $3, horario = $4, activo = $5, flota_id = $6 WHERE id = $1 RETURNING ${COLS}`,
+      [req.params.id, d.nombre, d.notas, d.horario ? JSON.stringify(d.horario) : null, activo, d.flotaId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Motocarro no encontrado' });
     res.json(rows[0]);

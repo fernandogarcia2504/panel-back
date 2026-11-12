@@ -8,6 +8,9 @@ import flotaRoutes from './routes/flota.js';
 import agentesRoutes from './routes/agentes.js';
 import operacionesRoutes from './routes/operaciones.js';
 import adminRoutes from './routes/admin.js';
+import incontrolRoutes from './routes/incontrol.js';
+import inventarioRoutes from './routes/inventario.js';
+import flotasRoutes from './routes/flotas.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
@@ -29,8 +32,11 @@ export function createApp() {
   // Panel (sesión)
   app.use('/api/auth', authRoutes);
   app.use('/api/flota', requireAuth, flotaRoutes);
+  app.use('/api/flotas', requireAuth, flotasRoutes);
   app.use('/api/agentes', requireAuth, agentesRoutes);
   app.use('/api/operaciones', requireAuth, operacionesRoutes);
+  app.use('/api/incontrol', requireAuth, incontrolRoutes);
+  app.use('/api/inventario', requireAuth, inventarioRoutes);
   app.use('/api', requireAuth, adminRoutes);
 
   app.use('/api', notFound);

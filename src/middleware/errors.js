@@ -51,6 +51,7 @@ export function errorHandler(err, req, res, next) {
   if (err?.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'JSON no válido' });
   }
+  if (err?.status === 409) return res.status(409).json({ error: err.message });
   if (err?.code && PG_ERRORES_CLIENTE[err.code]) {
     const [status, error] = PG_ERRORES_CLIENTE[err.code];
     return res.status(status).json({ error });

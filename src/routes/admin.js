@@ -38,6 +38,10 @@ const VALIDADORES = {
   retencion: (v, e) => ({
     diasMuestras: numero(e, v?.diasMuestras, 'Días de muestras', { min: 7, max: 730, entero: true }) ?? 30,
   }),
+  planSim: (v, e) => ({
+    gbMensual: numero(e, v?.gbMensual, 'GB del plan', { min: 0.1, max: 10000 }),
+    diaCorte: numero(e, v?.diaCorte, 'Día de corte', { min: 1, max: 28, entero: true }) ?? 1,
+  }),
 };
 
 router.put(
@@ -107,7 +111,7 @@ router.post(
     const e = [];
     const username = texto(e, req.body?.username, 'Usuario', { requerido: true, max: 40 })?.toLowerCase();
     const nombre = texto(e, req.body?.nombre, 'Nombre', { requerido: true, max: 120 });
-    const rol = opcion(e, req.body?.rol, 'Rol', ['admin', 'lectura'], { requerido: true });
+    const rol = opcion(e, req.body?.rol, 'Rol', ['admin', 'soporte'], { requerido: true });
     const password = req.body?.password;
     if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) e.push('El usuario solo admite letras, números, punto y guion');
     if (typeof password !== 'string' || password.length < 10) e.push('La contraseña debe tener al menos 10 caracteres');

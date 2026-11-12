@@ -1,7 +1,7 @@
 // Estado en vivo de toda la flota
 import { Router } from 'express';
 import { query } from '../db/pool.js';
-import { asyncHandler } from '../middleware/errors.js';
+import { asyncHandler, parseId } from '../middleware/errors.js';
 import { obtenerAjustes } from '../ajustes.js';
 import { describirRed, redesPorAsn } from '../redes.js';
 import { proximaVentana, ventanaActual } from '../horario.js';
@@ -40,14 +40,18 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const [ajustes, redes] = await Promise.all([obtenerAjustes(), redesPorAsn()]);
+    const flota = req.query.flota ? parseId(req.query.flota) : null;
     const { rows } = await query(
-      `SELECT a.*, o.id AS op_id, o.clave AS op_clave, o.inicio_programado, o.fin_programado, o.estado AS op_estado,
+      `SELECT a.*, f.nombre AS flota_nombre, o.id AS op_id, o.clave AS op_clave, o.inicio_programado, o.fin_programado, o.estado AS op_estado,
               o.reporte, o.reporte_obsoleto, o.intervalo_ms AS op_intervalo
          FROM agentes a
+         LEFT JOIN flotas f ON f.id = a.flota_id
          LEFT JOIN LATERAL (
            SELECT * FROM operaciones WHERE agente_id = a.id ORDER BY inicio_programado DESC LIMIT 1
          ) o ON TRUE
-        ORDER BY a.nombre`
+        WHERE ($1::int IS NULL OR a.flota_id = $1)
+        ORDER BY a.nombre`,
+      [flota]
     );
     const ahora = Date.now();
     const agentes = [];
@@ -82,6 +86,8 @@ router.get(
         id: a.id,
         nombre: a.nombre,
         notas: a.notas,
+        flotaId: a.flota_id,
+        flota: a.flota_nombre,
         estado,
         ultimaVez: a.ultima_vez,
         red: { ...red, asn: a.ultima_asn, ip: a.ultima_ip, colo: a.ultima_colo, desde: a.red_desde },

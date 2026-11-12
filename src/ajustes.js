@@ -16,6 +16,8 @@ export const AJUSTES_DEFECTO = {
     destino: 'central', // 'central' (funciona con la lista blanca) o 'cloudflare'
   },
   retencion: { diasMuestras: 30 }, // las muestras crudas se borran después; los reportes se conservan siempre
+  // Plan de datos de las SIM (para el % del ciclo y la proyección). La cuota real se controla en InControl2.
+  planSim: { gbMensual: null, diaCorte: 1 },
 };
 
 let cache = null;
